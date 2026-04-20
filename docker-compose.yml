@@ -1,0 +1,79 @@
+version: "3.9"
+
+services:
+
+  # ── LLM Shield Gateway ─────────────────────────────────────────────────────
+  gateway:
+    build:
+      context: ./gateway
+      dockerfile: Dockerfile
+    container_name: llm-shield-gateway
+    ports:
+      - "8000:8000"
+    environment:
+      LLM_BACKEND_URL: "http://mock-llm:8001"
+      OPA_URL: "http://opa:8181"
+      AUDIT_DB_PATH: "/data/audit.db"
+      BYPASS_OPA: "false"        # set to "true" to use fallback local policies
+    volumes:
+      - audit-data:/data
+    depends_on:
+      opa:
+        condition: service_healthy
+      mock-llm:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Mock LLM Backend (no API key needed) ───────────────────────────────────
+  mock-llm:
+    build:
+      context: ./mock_llm
+      dockerfile: Dockerfile
+    container_name: llm-shield-mock-llm
+    ports:
+      - "8001:8001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Open Policy Agent ──────────────────────────────────────────────────────
+  opa:
+    image: openpolicyagent/opa:latest-rootless
+    container_name: llm-shield-opa
+    ports:
+      - "8181:8181"
+    command:
+      - "run"
+      - "--server"
+      - "--log-level=info"
+      - "--addr=0.0.0.0:8181"
+      - "/policies"
+    volumes:
+      - ./policies:/policies:ro
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8181/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Audit Dashboard (optional) ─────────────────────────────────────────────
+  # Lightweight web UI to browse audit events in real time
+  audit-ui:
+    image: nginx:alpine
+    container_name: llm-shield-audit-ui
+    ports:
+      - "3000:80"
+    volumes:
+      - ./docs/audit-ui:/usr/share/nginx/html:ro
+    depends_on:
+      - gateway
+
+volumes:
+  audit-data:
+    driver: local

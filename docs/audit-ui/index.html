@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LLM Shield — Audit Dashboard</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #222536;
+      --border: #2e3347;
+      --text: #e2e8f0;
+      --muted: #8892a4;
+      --blue: #4f8ef7;
+      --green: #34d399;
+      --amber: #fbbf24;
+      --red: #f87171;
+      --purple: #a78bfa;
+      --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: var(--font); font-size: 14px; line-height: 1.6; }
+    header { border-bottom: 1px solid var(--border); padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; }
+    header h1 { font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+    .shield-icon { width: 22px; height: 22px; background: var(--blue); border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 12px; }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); display: inline-block; margin-right: 6px; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
+    .status-text { font-size: 12px; color: var(--muted); }
+    main { padding: 24px; max-width: 1200px; margin: 0 auto; }
+    .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+    .metric-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px 20px; }
+    .metric-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+    .metric-value { font-size: 28px; font-weight: 700; line-height: 1; }
+    .metric-sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+    .metric-value.blue   { color: var(--blue); }
+    .metric-value.green  { color: var(--green); }
+    .metric-value.amber  { color: var(--amber); }
+    .metric-value.red    { color: var(--red); }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+    @media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px 20px; }
+    .card-title { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between; }
+    .refresh-btn { background: none; border: 1px solid var(--border); color: var(--muted); font-size: 11px; padding: 3px 8px; border-radius: 4px; cursor: pointer; }
+    .refresh-btn:hover { border-color: var(--blue); color: var(--blue); }
+    table { width: 100%; border-collapse: collapse; }
+    th { font-size: 11px; color: var(--muted); text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); font-weight: 500; }
+    td { font-size: 12px; padding: 8px 8px; border-bottom: 1px solid var(--border); color: var(--text); vertical-align: top; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: var(--surface2); }
+    .badge { display: inline-block; font-size: 10px; font-weight: 600; padding: 2px 7px; border-radius: 4px; }
+    .badge-green  { background: rgba(52,211,153,0.15); color: var(--green); }
+    .badge-red    { background: rgba(248,113,113,0.15); color: var(--red); }
+    .badge-amber  { background: rgba(251,191,36,0.15);  color: var(--amber); }
+    .badge-blue   { background: rgba(79,142,247,0.15);  color: var(--blue); }
+    .badge-purple { background: rgba(167,139,250,0.15); color: var(--purple); }
+    .mono { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 11px; }
+    .empty { text-align: center; color: var(--muted); padding: 32px; font-size: 13px; }
+    .bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+    .bar-label { width: 100px; font-size: 12px; color: var(--muted); flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .bar-bg { flex: 1; background: var(--surface2); border-radius: 4px; height: 8px; }
+    .bar-fill { height: 8px; border-radius: 4px; background: var(--blue); min-width: 4px; transition: width 0.4s; }
+    .bar-count { width: 30px; text-align: right; font-size: 12px; color: var(--muted); flex-shrink: 0; }
+    .top-bar { display: flex; gap: 8px; margin-bottom: 20px; align-items: center; }
+    .top-bar input { flex:1; background: var(--surface2); border: 1px solid var(--border); color: var(--text); font-size: 13px; padding: 6px 12px; border-radius: 6px; outline: none; }
+    .top-bar input:focus { border-color: var(--blue); }
+    select { background: var(--surface2); border: 1px solid var(--border); color: var(--text); font-size: 13px; padding: 6px 10px; border-radius: 6px; cursor: pointer; outline: none; }
+    .pii-chip { display: inline-block; font-size: 10px; background: rgba(167,139,250,0.15); color: var(--purple); border-radius: 3px; padding: 1px 5px; margin: 1px; font-family: monospace; }
+    .inj-chip { display: inline-block; font-size: 10px; background: rgba(248,113,113,0.15); color: var(--red); border-radius: 3px; padding: 1px 5px; margin: 1px; font-family: monospace; }
+    .ts { color: var(--muted); font-size: 11px; }
+    #loading { text-align: center; color: var(--muted); padding: 40px; }
+    footer { border-top: 1px solid var(--border); padding: 14px 24px; text-align: center; font-size: 11px; color: var(--muted); }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>
+    <div class="shield-icon">🛡</div>
+    LLM Shield &mdash; Audit Dashboard
+  </h1>
+  <div class="status-text">
+    <span class="status-dot" id="status-dot"></span>
+    <span id="status-text">Connecting...</span>
+  </div>
+</header>
+
+<main>
+  <div id="loading">Loading security metrics...</div>
+  <div id="content" style="display:none">
+
+    <!-- Metric cards -->
+    <div class="metrics-grid" id="metrics-grid"></div>
+
+    <!-- Middle row -->
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">Top applications <button class="refresh-btn" onclick="load()">↻ Refresh</button></div>
+        <div id="top-apps"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Security breakdown</div>
+        <div id="security-breakdown"></div>
+      </div>
+    </div>
+
+    <!-- Event table -->
+    <div class="card">
+      <div class="card-title">Recent audit events</div>
+      <div class="top-bar">
+        <input type="text" id="filter-app" placeholder="Filter by app ID..." oninput="renderTable()" />
+        <select id="filter-status" onchange="renderTable()">
+          <option value="">All statuses</option>
+          <option value="allowed">Allowed</option>
+          <option value="blocked">Blocked</option>
+        </select>
+      </div>
+      <div id="event-table"></div>
+    </div>
+
+  </div>
+</main>
+
+<footer>LLM Shield &mdash; AI Security Gateway &nbsp;|&nbsp; <a href="https://github.com/YOUR_USERNAME/llm-shield" style="color:var(--blue);text-decoration:none;">github.com/YOUR_USERNAME/llm-shield</a></footer>
+
+<script>
+const GATEWAY = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  ? 'http://localhost:8000'
+  : window.location.origin.replace(':3000', ':8000');
+
+let allEvents = [];
+let summaryData = {};
+
+async function fetchJSON(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`HTTP ${r.status}`);
+  return r.json();
+}
+
+function fmtTime(ts) {
+  if (!ts) return '—';
+  const d = new Date(ts * 1000);
+  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+function riskBadge(level) {
+  if (!level) return '<span class="badge badge-blue">—</span>';
+  const map = { LOW: 'badge-green', MEDIUM: 'badge-amber', HIGH: 'badge-red' };
+  return `<span class="badge ${map[level] || 'badge-blue'}">${level}</span>`;
+}
+
+function policyBadge(decision) {
+  if (!decision) return '<span class="badge badge-blue">—</span>';
+  return decision === 'ALLOW'
+    ? '<span class="badge badge-green">ALLOW</span>'
+    : '<span class="badge badge-red">DENY</span>';
+}
+
+function blockedBadge(blocked) {
+  return blocked
+    ? '<span class="badge badge-red">BLOCKED</span>'
+    : '<span class="badge badge-green">PASSED</span>';
+}
+
+function renderMetrics(s) {
+  const blockRate = s.block_rate_pct || 0;
+  const rateColor = blockRate > 20 ? 'red' : blockRate > 5 ? 'amber' : 'green';
+  document.getElementById('metrics-grid').innerHTML = `
+    <div class="metric-card">
+      <div class="metric-label">Total requests</div>
+      <div class="metric-value blue">${s.total_requests ?? 0}</div>
+      <div class="metric-sub">All time</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">Blocked</div>
+      <div class="metric-value red">${s.blocked_requests ?? 0}</div>
+      <div class="metric-sub">Block rate: <span style="color:var(--${rateColor})">${blockRate}%</span></div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">PII events</div>
+      <div class="metric-value amber">${s.requests_with_pii ?? 0}</div>
+      <div class="metric-sub">Requests with detected PII</div>
+    </div>
+    <div class="metric-card">
+      <div class="metric-label">High injection</div>
+      <div class="metric-value red">${s.high_injection_attempts ?? 0}</div>
+      <div class="metric-sub">High-risk injection attempts</div>
+    </div>
+  `;
+}
+
+function renderTopApps(apps) {
+  if (!apps || !apps.length) {
+    document.getElementById('top-apps').innerHTML = '<div class="empty">No data yet</div>';
+    return;
+  }
+  const max = apps[0].calls;
+  document.getElementById('top-apps').innerHTML = apps.map(a => `
+    <div class="bar-row">
+      <span class="bar-label" title="${a.app_id}">${a.app_id}</span>
+      <div class="bar-bg"><div class="bar-fill" style="width:${Math.round(a.calls/max*100)}%"></div></div>
+      <span class="bar-count">${a.calls}</span>
+    </div>
+  `).join('');
+}
+
+function renderBreakdown(s) {
+  const total = s.total_requests || 1;
+  const allowed = total - (s.blocked_requests || 0);
+  const pii = s.requests_with_pii || 0;
+  const inj = s.high_injection_attempts || 0;
+  document.getElementById('security-breakdown').innerHTML = `
+    <div style="margin-bottom:16px">
+      <div class="bar-row">
+        <span class="bar-label">Allowed</span>
+        <div class="bar-bg"><div class="bar-fill" style="width:${Math.round(allowed/total*100)}%;background:var(--green)"></div></div>
+        <span class="bar-count">${allowed}</span>
+      </div>
+      <div class="bar-row">
+        <span class="bar-label">Blocked</span>
+        <div class="bar-bg"><div class="bar-fill" style="width:${Math.round((s.blocked_requests||0)/total*100)}%;background:var(--red)"></div></div>
+        <span class="bar-count">${s.blocked_requests||0}</span>
+      </div>
+      <div class="bar-row">
+        <span class="bar-label">PII detected</span>
+        <div class="bar-bg"><div class="bar-fill" style="width:${Math.round(pii/total*100)}%;background:var(--amber)"></div></div>
+        <span class="bar-count">${pii}</span>
+      </div>
+      <div class="bar-row">
+        <span class="bar-label">High injection</span>
+        <div class="bar-bg"><div class="bar-fill" style="width:${Math.round(inj/total*100)}%;background:var(--purple)"></div></div>
+        <span class="bar-count">${inj}</span>
+      </div>
+    </div>
+    <p style="font-size:11px;color:var(--muted)">Based on ${total} total request${total!==1?'s':''}</p>
+  `;
+}
+
+function renderTable() {
+  const filterApp = document.getElementById('filter-app').value.toLowerCase();
+  const filterStatus = document.getElementById('filter-status').value;
+
+  let events = allEvents.filter(e => {
+    if (filterApp && !e.app_id.toLowerCase().includes(filterApp)) return false;
+    if (filterStatus === 'blocked' && !e.blocked) return false;
+    if (filterStatus === 'allowed' && e.blocked) return false;
+    return true;
+  });
+
+  if (!events.length) {
+    document.getElementById('event-table').innerHTML =
+      '<div class="empty">No events match your filter.</div>';
+    return;
+  }
+
+  const rows = events.slice(0, 100).map(e => {
+    const piiChips = (e.pii_detections || [])
+      .map(d => `<span class="pii-chip">${d.entity_type}</span>`).join('');
+    const injPatterns = (e.injection_risk?.patterns || [])
+      .map(p => `<span class="inj-chip">${p}</span>`).join('');
+    return `
+      <tr>
+        <td class="ts">${fmtTime(e.timestamp)}</td>
+        <td class="mono">${e.app_id}</td>
+        <td class="mono">${e.model}</td>
+        <td>${policyBadge(e.policy_decision)}</td>
+        <td>${piiChips || '<span style="color:var(--muted)">—</span>'}</td>
+        <td>${riskBadge(e.injection_risk?.level)}</td>
+        <td>${blockedBadge(e.blocked)}</td>
+        <td>${e.latency_ms != null ? e.latency_ms + 'ms' : '—'}</td>
+      </tr>
+    `;
+  }).join('');
+
+  document.getElementById('event-table').innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>Time</th><th>App</th><th>Model</th>
+          <th>Policy</th><th>PII detected</th>
+          <th>Injection</th><th>Status</th><th>Latency</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
+async function load() {
+  try {
+    const [summary, events] = await Promise.all([
+      fetchJSON(`${GATEWAY}/v1/audit/summary`),
+      fetchJSON(`${GATEWAY}/v1/audit/events?limit=200`),
+    ]);
+
+    summaryData = summary;
+    allEvents = events.events || [];
+
+    renderMetrics(summary);
+    renderTopApps(summary.top_applications || []);
+    renderBreakdown(summary);
+    renderTable();
+
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('content').style.display = 'block';
+    document.getElementById('status-dot').style.background = 'var(--green)';
+    document.getElementById('status-text').textContent =
+      'Live · updated ' + new Date().toLocaleTimeString();
+  } catch (err) {
+    document.getElementById('status-dot').style.background = 'var(--red)';
+    document.getElementById('status-text').textContent = 'Gateway unreachable';
+    document.getElementById('loading').textContent =
+      'Cannot reach LLM Shield gateway. Make sure docker-compose is running.';
+  }
+}
+
+load();
+setInterval(load, 10000); // auto-refresh every 10 seconds
+</script>
+</body>
+</html>
