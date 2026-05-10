@@ -101,8 +101,8 @@ Queryable via REST API for real-time compliance reporting.
 ### 1. Clone and start
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/llm-shield.git
-cd llm-shield
+git clone https://github.com/YOUR_USERNAME/llm-security-center.git
+cd llm-security-center
 docker-compose up --build
 ```
 
@@ -112,7 +112,7 @@ Wait for all three services to report healthy (about 60 seconds on first build).
 
 ```bash
 curl http://localhost:8000/health
-# {"status":"healthy","service":"llm-shield","version":"1.0.0"}
+# {"status":"healthy","service":"llm-security-center","version":"1.0.0"}
 ```
 
 ### 3. Run the interactive demo
@@ -265,7 +265,7 @@ Gateway health check.
 ## Project structure
 
 ```
-llm-shield/
+llm-security-center/
 ├── gateway/
 │   ├── main.py              # FastAPI application, request pipeline
 │   ├── pii_scanner.py       # PII detection and tokenisation
