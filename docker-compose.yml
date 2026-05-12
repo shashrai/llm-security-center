@@ -19,14 +19,15 @@ services:
       - audit-data:/data
     depends_on:
       opa:
-        condition: service_healthy
+        condition: service_started
       mock-llm:
-        condition: service_healthy
+        condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 15s
 
   # ── Mock LLM Backend (no API key needed) ───────────────────────────────────
   mock-llm:
@@ -37,10 +38,11 @@ services:
     ports:
       - "8001:8001"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      test: ["CMD", "sh", "-c", "exec 3<>/dev/tcp/127.0.0.1/8001 && echo -e 'GET /health HTTP/1.1\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && cat <&3 | grep -q 'HTTP'"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
 
   # ── Open Policy Agent ──────────────────────────────────────────────────────
   opa:
@@ -57,10 +59,11 @@ services:
     volumes:
       - ./policies:/policies:ro
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8181/health"]
+      test: ["CMD", "sh", "-c", "exec 3<>/dev/tcp/127.0.0.1/8181 && echo -e 'GET /health HTTP/1.1\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && cat <&3 | grep -q 'HTTP'"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 15s
 
   # ── Audit Dashboard (optional) ─────────────────────────────────────────────
   # Lightweight web UI to browse audit events in real time

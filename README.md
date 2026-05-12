@@ -101,7 +101,7 @@ Queryable via REST API for real-time compliance reporting.
 ### 1. Clone and start
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/llm-security-center.git
+git clone https://github.com/shashrai/llm-security-center.git
 cd llm-security-center
 docker-compose up --build
 ```
